@@ -1,66 +1,90 @@
-from flask import Flask, request, make_response, jsonify
-import uuid
-from collections import defaultdict
-from datetime import datetime
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>MSPFA Reader Stats</title>
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    background: #111;
+    color: #eee;
+    padding: 20px;
+  }
+  h1 {
+    margin-top: 0;
+  }
+  .box {
+    background: #1b1b1b;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .bar {
+    height: 22px;
+    background: #333;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .fill {
+    height: 100%;
+    background: #e74c3c;
+  }
+  .page-title {
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+</head>
+<body>
 
-app = Flask(__name__)
+<h1>📊 MSPFA Analytics</h1>
 
-# page -> set(reader_id)
-stats = defaultdict(set)
+<div class="box">
+  <strong>Уникальных читателей всего:</strong>
+  <span id="total">—</span>
+</div>
 
-# лог событий (для будущего расширения)
-events = []
+<div id="pages"></div>
 
-@app.route("/track")
-def track():
-    page = request.args.get("page")
-    if not page:
-        return "page required", 400
+<script>
+fetch("https://mspfa-tracker.onrender.com/stats")
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById("total").textContent =
+      data.total_unique_readers;
 
-    reader_id = request.cookies.get("reader_id")
-    if not reader_id:
-        reader_id = str(uuid.uuid4())
+    const max = Math.max(
+      ...data.pages.map(p => p.unique_readers)
+    );
 
-    stats[page].add(reader_id)
-    events.append({
-        "time": datetime.utcnow().isoformat(),
-        "page": page,
-        "reader": reader_id
-    })
+    const container = document.getElementById("pages");
 
-    resp = make_response("", 204)
-    resp.set_cookie(
-        "reader_id",
-        reader_id,
-        max_age=60 * 60 * 24 * 365,
-        samesite="Lax"
-    )
-    return resp
+    data.pages.forEach(p => {
+      const percent = max
+        ? Math.round((p.unique_readers / max) * 100)
+        : 0;
 
+      const box = document.createElement("div");
+      box.className = "box";
 
-@app.route("/stats")
-def get_stats():
-    # сортируем страницы как числа
-    pages = sorted(stats.keys(), key=lambda x: int(x))
+      box.innerHTML = `
+        <div class="page-title">
+          <strong>Страница ${p.page}</strong>
+          <span>${p.unique_readers}</span>
+        </div>
+        <div class="bar">
+          <div class="fill" style="width:${percent}%"></div>
+        </div>
+      `;
 
-    base = len(stats[pages[0]]) if pages else 1
+      container.appendChild(box);
+    });
+  })
+  .catch(() => {
+    document.getElementById("total").textContent = "ошибка загрузки";
+  });
+</script>
 
-    result = []
-    for p in pages:
-        count = len(stats[p])
-        percent = round((count / base) * 100, 1) if base else 0
-        result.append({
-            "page": int(p),
-            "unique": count,
-            "percent": percent
-        })
-
-    return jsonify({
-        "total_readers": base,
-        "pages": result
-    })
-
-
-@app.route("/")
-def home():
-    return "MSPFA tracker running"
+</body>
+</html>
