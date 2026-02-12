@@ -48,43 +48,29 @@
 <div id="pages"></div>
 
 <script>
-fetch("https://mspfa-tracker.onrender.com/stats")
-  .then(r => r.json())
-  .then(data => {
-    document.getElementById("total").textContent =
-      data.total_unique_readers;
+(function () {
+  const KEY = "mspfa_reader_id";
 
-    const max = Math.max(
-      ...data.pages.map(p => p.unique_readers)
-    );
+  let uid = localStorage.getItem(KEY);
+  if (!uid) {
+    uid = crypto.randomUUID();
+    localStorage.setItem(KEY, uid);
+  }
 
-    const container = document.getElementById("pages");
-
-    data.pages.forEach(p => {
-      const percent = max
-        ? Math.round((p.unique_readers / max) * 100)
-        : 0;
-
-      const box = document.createElement("div");
-      box.className = "box";
-
-      box.innerHTML = `
-        <div class="page-title">
-          <strong>Страница ${p.page}</strong>
-          <span>${p.unique_readers}</span>
-        </div>
-        <div class="bar">
-          <div class="fill" style="width:${percent}%"></div>
-        </div>
-      `;
-
-      container.appendChild(box);
-    });
-  })
-  .catch(() => {
-    document.getElementById("total").textContent = "ошибка загрузки";
+  fetch("https://mspfa-tracker.onrender.com/track", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      page: 1,              // номер страницы
+      reader_id: uid
+    })
   });
+})();
 </script>
+
 
 </body>
 </html>
+
